@@ -15,15 +15,17 @@ if __name__ == '__main__':
     
     IMG_SIZE = 220
     BATCH_SIZE = 128
-    EPOCHS = 2000
+    EPOCHS = 200
     SEED = 0
+    SIMSIAM = True
 
     resnet = models.resnet50(pretrained=True)
 
     learner = BYOL(
         resnet,
         image_size = IMG_SIZE,
-        hidden_layer = 'avgpool'
+        hidden_layer = 'avgpool',
+        use_momentum = not SIMSIAM,
     )
 
     opt = torch.optim.Adam(learner.parameters(), lr=3e-4)
@@ -42,20 +44,26 @@ if __name__ == '__main__':
 
     best_loss = np.inf
     for epoch in range(EPOCHS):
+        epoch_loss = 0
         for images, labels, names in dataloader:
             loss = learner(images)
-            with open(PRINT_PATH, "a") as f:
-                f.write(f'--- Epoch: {epoch}, loss: {loss.item()}\n')
-
-            if loss.item() < best_loss:
-                best_loss = loss.item()
-                with open(PRINT_PATH, "a") as f:
-                    f.write(f'best loss saved: {best_loss}\n')
-                # save your improved network
-                torch.save(learner.online_encoder.state_dict(), './results/checkpoints/online_encoder.pt')
-            
+            epoch_loss += loss.item()    
             opt.zero_grad()
             loss.backward()
             opt.step()
             learner.update_moving_average() # update moving average of target encoder
+        
+        epoch_loss /= len(dataloader)
+        with open(PRINT_PATH, "a") as f:
+            f.write(f'--- Epoch: {epoch}, loss: {epoch_loss}\n')
+        
+        if epoch_loss < best_loss:
+            best_loss = epoch_loss
+            with open(PRINT_PATH, "a") as f:
+                f.write(f'best loss saved: {best_loss}\n')
+            # save your improved network
+            torch.save(
+                    {'epoch': epoch,
+                    'state_dict': learner.online_encoder.state_dict()}
+                , './results/checkpoints/online_encoder.pt')
 
