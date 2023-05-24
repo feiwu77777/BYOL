@@ -17,7 +17,7 @@ if __name__ == '__main__':
     BATCH_SIZE = 128
     EPOCHS = 200
     SEED = 0
-    SIMSIAM = True
+    SIMSIAM = False
 
     resnet = models.resnet50(pretrained=True)
 
@@ -47,11 +47,13 @@ if __name__ == '__main__':
         epoch_loss = 0
         for images, labels, names in dataloader:
             loss = learner(images)
-            epoch_loss += loss.item()    
+            epoch_loss += loss.item()
             opt.zero_grad()
             loss.backward()
             opt.step()
-            learner.update_moving_average() # update moving average of target encoder
+
+            if not SIMSIAM:
+                learner.update_moving_average() # update moving average of target encoder
         
         epoch_loss /= len(dataloader)
         with open(PRINT_PATH, "a") as f:
@@ -64,6 +66,12 @@ if __name__ == '__main__':
             # save your improved network
             torch.save(
                     {'epoch': epoch,
-                    'state_dict': learner.online_encoder.state_dict()}
-                , './results/checkpoints/online_encoder.pt')
+                    'online_encoder': learner.online_encoder.state_dict(),
+                    'online_predictor': learner.online_predictor.state_dict()}
+                , './results/checkpoints/best_model.pt')
 
+        torch.save(
+                {'epoch': epoch,
+                'online_encoder': learner.online_encoder.state_dict(),
+                'online_predictor': learner.online_predictor.state_dict()}
+            , './results/checkpoints/latest_model.pt')
