@@ -1,5 +1,6 @@
 import torch
-from byol_pytorch import BYOL
+from BYOL import BYOL
+
 from torchvision import models
 from dataHandlers import DataHandlerAurisSeg
 from torch.utils.data import DataLoader
@@ -13,12 +14,8 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 
 def init_distributed_dataparallel():
-    torch.manual_seed(0)
-    if torch.cuda.is_available():
-        ngpus_per_node = torch.cuda.device_count()
-        print('ngpus per node', ngpus_per_node)
-    else:
-        ngpus_per_node = 1
+    ngpus_per_node = torch.cuda.device_count()
+    print('ngpus per node', ngpus_per_node)
 
     world_size = 1
     # Since we have ngpus_per_node processes per node, the total world_size
@@ -37,13 +34,11 @@ def main(gpu, ngpus_per_node, world_size):
     dist.init_process_group(backend=dist_backend, init_method=dist_url,
                             world_size=world_size, rank=rank)
     
-
-
-    if os.path.isfile(PRINT_PATH):
-        os.remove(PRINT_PATH)
+    # if os.path.isfile(PRINT_PATH):
+    #     os.remove(PRINT_PATH)
     
     IMG_SIZE = 220
-    BATCH_SIZE = 258
+    BATCH_SIZE = 224
     EPOCHS = 200
     SEED = 0
     SIMSIAM = False
@@ -63,7 +58,7 @@ def main(gpu, ngpus_per_node, world_size):
         use_momentum = not SIMSIAM,
     )
 
-    learner = torch.nn.parallel.DistributedDataParallel(learner, device_ids=[gpu])
+    learner = torch.nn.parallel.DistributedDataParallel(learner, device_ids=[gpu], find_unused_parameters=not SIMSIAM)
     device = torch.device('cuda:{}'.format(gpu))
 
     opt = torch.optim.Adam(learner.parameters(), lr=3e-4)
@@ -80,6 +75,7 @@ def main(gpu, ngpus_per_node, world_size):
         num_workers=workers, pin_memory=True, sampler=dataset_sampler)
 
     with open(PRINT_PATH, "a") as f:
+        f.write(f'--- Rank {rank} ---\n')
         f.write(f'folders: {sorted(train_data.keys())}, {len(train_data.keys())}\n')
         f.write(f'train dataset length {len(dataset)}\n')
         f.write(f'first dataset sample: {dataset.data_pool[0]}\n')
@@ -99,27 +95,27 @@ def main(gpu, ngpus_per_node, world_size):
             opt.step()
 
             if not SIMSIAM:
-                learner.update_moving_average() # update moving average of target encoder
+                learner.module.update_moving_average() # update moving average of target encoder
         
         epoch_loss /= len(dataloader)
         with open(PRINT_PATH, "a") as f:
-            f.write(f'--- Epoch: {epoch}, loss: {epoch_loss}\n')
+            f.write(f'--- Rank {rank} - Epoch: {epoch}, loss: {epoch_loss}\n')
         
         if epoch_loss < best_loss:
             best_loss = epoch_loss
             with open(PRINT_PATH, "a") as f:
-                f.write(f'best loss saved: {best_loss}\n')
+                f.write(f'Rank {rank} - best loss saved: {best_loss}\n')
             # save your improved network
             torch.save(
                     {'epoch': epoch,
-                    'online_encoder': learner.online_encoder.state_dict(),
-                    'online_predictor': learner.online_predictor.state_dict()}
+                    'online_encoder': learner.module.online_encoder.state_dict(),
+                    'online_predictor': learner.module.online_predictor.state_dict()}
                 , './results/checkpoints/best_model.pt')
 
         torch.save(
                 {'epoch': epoch,
-                'online_encoder': learner.online_encoder.state_dict(),
-                'online_predictor': learner.online_predictor.state_dict()}
+                'online_encoder': learner.module.online_encoder.state_dict(),
+                'online_predictor': learner.module.online_predictor.state_dict()}
             , './results/checkpoints/latest_model.pt')
         
 if __name__ == '__main__':
