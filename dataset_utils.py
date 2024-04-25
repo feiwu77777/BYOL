@@ -1,96 +1,37 @@
 import numpy as np
 import os
-from routes import CLASS_ID_CUT, CLASS_ID_TYPE
+import torch
+from routes import CLASS_ID_CUT, CLASS_ID_TYPE, AURIS_SEG_PATH, PASCAL_PATH
+from dataHandlers import DataHandlerAurisSeg, DataHandlerPascal
 
-# def get_data(path):
-#     img_paths = []
-#     tool_labels = []
-#     episod_labels = []
 
-#     # iterate over all patient
-#     for folder in sorted(os.listdir(path)):
-#         if folder.isnumeric():
-#             #print('folder: ', folder)
-#             folder_path = os.path.join(path, folder)
-#             tool_dict = get_label(path, folder)
-#             # a dict whose key is the frame index and value is the label
+def prepare_dataset(dataset_name, batch_size, workers, distributed=False):
+    ## the data transformation is carried out in the learner class
 
-#             # image paths and labels per patient
-#             frames = []
-#             tool_label = []
-#             # iterate over all the frames
-#             for frame_i in sorted(os.listdir(folder_path)):
-#                 nb = int(frame_i[5:frame_i.find('.')])  # get frame index
-#                 if nb in tool_dict:  # if this frame has a label
-#                     img_path = os.path.join(folder_path, frame_i)
-#                     frames.append(img_path)
-#                     tool_label.append(tool_dict[nb])
+    if dataset_name == 'auris':
+        train_data, val_data, _ = divide_data_split_auris(AURIS_SEG_PATH, AURIS_SEG_PATH, num_val=0)
+        dataset = DataHandlerAurisSeg(data_path=train_data, label_path=AURIS_SEG_PATH)
+    
+    elif dataset_name == 'pascal_VOC':
+        with open(PASCAL_PATH + 'train.txt', 'r') as file:
+            TRAIN_SEQ = file.read()
+        img_path = PASCAL_PATH + 'images/'
+        TRAIN_SEQ = TRAIN_SEQ.split('\n')
+        TRAIN_SEQ = [img_path + t + '.jpg' for t in TRAIN_SEQ if len(t) > 0]
+        dataset = DataHandlerPascal(img_path=img_path, sequences=TRAIN_SEQ)
 
-#             img_paths.append(frames)
-#             tool_labels.append(tool_label)
+    if distributed:
+        dataset_sampler = torch.utils.data.distributed.DistributedSampler(dataset)
+        dataloader = torch.utils.data.DataLoader(
+            dataset, batch_size=batch_size, shuffle=(dataset_sampler is None),
+            num_workers=workers, pin_memory=True, sampler=dataset_sampler)
+    else:
+        dataset_sampler = None
+        dataloader = torch.utils.data.DataLoader(
+            dataset, batch_size=batch_size, shuffle=True,
+            num_workers=workers, pin_memory=True)
+    return dataloader, dataset_sampler
 
-#     return img_paths, tool_labels, episod_labels
-
-# def get_label(path, folder):
-#     tool_label = {}
-#     episod_label = {}
-#     list_nb = 0
-#     with open(os.path.join(path, f'{folder}.txt'), 'r') as file:
-#         label = file.read()
-#     i = 0
-#     while i < len(label):
-#         if label[i].isnumeric():
-#             j = i
-#             while label[j].isnumeric():
-#                 j += 1
-#             res = int(label[i:j])
-#             i = j
-#             if list_nb % 3 == 0:
-#                 key = res
-#             elif list_nb % 3 == 1:
-#                 if key in tool_label and tool_label[key] != res:
-#                     print('error')
-#                 tool_label[key] = res
-#             elif list_nb % 3 == 2:
-#                 if key in episod_label and episod_label[key] != res:
-#                     print('error')
-#                 episod_label[key] = res
-#             list_nb += 1
-#         else:
-#             i += 1
-
-#     return tool_label
-
-# def divide_data(path, transform):
-#     img_paths, tool_labels, episod_labels = get_data(path)
-
-#     ############# split into training and test set ##############
-#     train_ind = [1, 2, 3, 4]
-
-#     train_imgs = [x for i, x in enumerate(img_paths) if i in train_ind]
-#     train_imgs = np.concatenate(train_imgs, axis=0)
-#     train_tool = [x for i, x in enumerate(tool_labels) if i in train_ind]
-#     train_tool = np.concatenate(train_tool, axis=0)
-
-#     ########### balance the dataset to have nb_tool = nb_background #############
-#     tool_idxs = np.arange(len(train_tool))[train_tool != 0]
-#     back_idxs = np.arange(len(train_tool))[train_tool == 0]
-
-#     np.random.shuffle(back_idxs)
-#     np.random.shuffle(tool_idxs)
-#     print('first background ind is: ', back_idxs[0])
-#     print('first tool ind is: ', tool_idxs[0])
-
-#     back_idxs = back_idxs[:len(tool_idxs)]
-#     new_inds = np.concatenate((tool_idxs, back_idxs))
-#     np.random.shuffle(new_inds)
-#     print('first element of new_inds: ', new_inds[0])
-
-#     train_tool = train_tool[new_inds]
-#     train_imgs = train_imgs[new_inds]
-
-#     print('dataset length: ', len(train_tool))
-#     return DataHandler(path=train_imgs, label=train_tool, transform=transform)
 
 def divide_data_split_auris(img_path, lab_path, num_val=15):
     data_split = {

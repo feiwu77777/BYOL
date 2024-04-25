@@ -19,4 +19,7 @@ YOUTUBE_CLASS_ID_TYPE = 'd0fb600c73/'
 # UAVID_PATH = "../dataset/UAVID2020/train/"
 UAVID_PATH = "../dataset/simCLR_UAVID2020/"
 
+# pascal VOC dataset
+PASCAL_PATH = "/storage/workspaces/artorg_aimi/ws_00000/fei/pascal_VOC_small/"
+
 PRINT_PATH = './results/log.txt'

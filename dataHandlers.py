@@ -59,6 +59,7 @@ class DataHandlerIntuitive(Dataset):
     def __len__(self):
         return len(self.img_path)
 
+
 class DataHandlerYoutube(Dataset):
     def __init__(self,
                  data_path,
@@ -86,8 +87,13 @@ class DataHandlerYoutube(Dataset):
     def __len__(self):
         return len(self.data_pool)
 
+
 class DataHandlerAurisSeg(Dataset):
-    def __init__(self, data_path, transform=None, label_path=AURIS_SEG_PATH, eval=False):
+    def __init__(self, 
+                 data_path, 
+                 transform=None, 
+                 label_path=AURIS_SEG_PATH, 
+                 eval=False):
         self.data_path = data_path
         self.data_pool = np.concatenate(list(data_path.values()), axis=0)
         self.transform = transform
@@ -113,6 +119,7 @@ class DataHandlerAurisSeg(Dataset):
 
     def __len__(self):
         return len(self.data_pool)
+
 
 class DataHandlerUAVID(Dataset):
     def __init__(self,
@@ -155,3 +162,41 @@ class DataHandlerUAVID(Dataset):
 
     def __len__(self):
         return len(self.imgs)
+
+
+class DataHandlerPascal(Dataset):
+    def __init__(
+        self,
+        img_path,
+        sequences,
+        transform=None,
+    ):
+        super(DataHandlerPascal).__init__()
+        self.img_path = img_path
+        self.data_pool = []
+
+        for frame_path in sequences:
+            self.data_pool.append(
+                (frame_path, frame_path.replace("images", "labels").replace("jpg", "png"))
+            )
+            
+        self.data_pool = np.array(self.data_pool)
+        self.transform = transform
+
+        self.normalize_op = transforms.Normalize(
+            mean=torch.tensor([0.485, 0.456, 0.406]),
+            std=torch.tensor([0.229, 0.224, 0.225])
+        )
+        self.tensor_op = transforms.ToTensor()
+
+    def __getitem__(self, item):
+        img_path, label_path = self.data_pool[item]
+        x = Image.open(img_path)
+        x = self.tensor_op(x)
+        x = self.normalize_op(x)
+
+        name = img_path.split("/")[-1].split(".")[0]
+        return x, np.zeros((10, 10)), name
+
+    def __len__(self):
+        return len(self.data_pool)

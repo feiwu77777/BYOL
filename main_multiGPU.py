@@ -2,12 +2,10 @@ import torch
 from BYOL import BYOL
 
 from torchvision import models
-from dataHandlers import DataHandlerAurisSeg
-from torch.utils.data import DataLoader
-from routes import AURIS_SEG_PATH, PRINT_PATH
-from dataset_utils import divide_data_split_auris
+from routes import PRINT_PATH
 import numpy as np
 from utils import set_random
+from dataset_utils import prepare_dataset
 import os
 
 import torch.distributed as dist
@@ -15,7 +13,8 @@ import torch.multiprocessing as mp
 
 def init_distributed_dataparallel():
     ngpus_per_node = torch.cuda.device_count()
-    print('ngpus per node', ngpus_per_node)
+    with open(PRINT_PATH, "a") as f:
+        f.write(f'ngpus per node: {ngpus_per_node}')
 
     world_size = 1
     # Since we have ngpus_per_node processes per node, the total world_size
@@ -26,19 +25,25 @@ def init_distributed_dataparallel():
     mp.spawn(main, nprocs=ngpus_per_node, args=(ngpus_per_node, world_size))
 
 def main(gpu, ngpus_per_node, world_size):
-    rank = 0
-    rank = rank * ngpus_per_node + gpu
+    init_rank = 0
+    rank = init_rank * ngpus_per_node + gpu
 
     dist_backend = 'nccl'
     dist_url = 'tcp://127.0.0.1:33333'
     dist.init_process_group(backend=dist_backend, init_method=dist_url,
                             world_size=world_size, rank=rank)
+
+    with open(PRINT_PATH, "a") as f:
+        f.write(f'Rank {rank} - Initialized process group\n')
     
-    # if os.path.isfile(PRINT_PATH):
-    #     os.remove(PRINT_PATH)
+    if dist.get_rank() == 0:
+        if os.path.exists(PRINT_PATH):
+            os.remove(PRINT_PATH)
+        if not os.path.exists('./results/checkpoints'):
+            os.makedirs('./results/checkpoints')
     
-    IMG_SIZE = 220
-    BATCH_SIZE = 224
+    IMG_SIZE = 512
+    BATCH_SIZE = 64
     EPOCHS = 200
     SEED = 0
     SIMSIAM = False
@@ -60,33 +65,31 @@ def main(gpu, ngpus_per_node, world_size):
 
     learner = torch.nn.parallel.DistributedDataParallel(learner, device_ids=[gpu], find_unused_parameters=not SIMSIAM)
     device = torch.device('cuda:{}'.format(gpu))
-
     opt = torch.optim.Adam(learner.parameters(), lr=3e-4)
 
+    ## prepare datasets ##
     set_random(SEED)
-    train_data, val_data, _ = divide_data_split_auris(AURIS_SEG_PATH, AURIS_SEG_PATH, num_val=0)
-    
-    dataset = DataHandlerAurisSeg(data_path=train_data, label_path=AURIS_SEG_PATH)
-    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
+    dataset_name = 'pascal_VOC'
+    dataloader, dataset_sampler = prepare_dataset(dataset_name, BATCH_SIZE, workers)
 
-    dataset_sampler = torch.utils.data.distributed.DistributedSampler(dataset)
-    dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size=BATCH_SIZE, shuffle=(dataset_sampler is None),
-        num_workers=workers, pin_memory=True, sampler=dataset_sampler)
-
+    _, _, names = next(iter(dataloader))
     with open(PRINT_PATH, "a") as f:
         f.write(f'--- Rank {rank} ---\n')
-        f.write(f'folders: {sorted(train_data.keys())}, {len(train_data.keys())}\n')
-        f.write(f'train dataset length {len(dataset)}\n')
-        f.write(f'first dataset sample: {dataset.data_pool[0]}\n')
+        # f.write(f'folders: {sorted(train_data.keys())}, {len(train_data.keys())}\n')
+        f.write(f'train dataset length {len(dataloader.dataset)}\n')
+        f.write(f'first dataset sample: {names[0]}\n')
         f.write(f'train dataloader length: {len(dataloader)}, bs: {BATCH_SIZE}\n')
 
     best_loss = np.inf
     for epoch in range(EPOCHS):
         dataset_sampler.set_epoch(epoch)
-
+        
+        with open(PRINT_PATH, "a") as f:
+            f.write(f'Rank {rank} - Epoch: {epoch}\n')
         epoch_loss = 0
         for images, labels, names in dataloader:
+            with open(PRINT_PATH, "a") as f:
+                f.write(f'Rank {rank} - images: {images.shape}, labels: {labels.shape}\n')
             images = images.to(device, non_blocking=True)
             loss = learner(images)
             epoch_loss += loss.item()
