@@ -22,4 +22,7 @@ UAVID_PATH = "../dataset/simCLR_UAVID2020/"
 # pascal VOC dataset
 PASCAL_PATH = "/storage/workspaces/artorg_aimi/ws_00000/fei/pascal_VOC_small/"
 
+# cityscapes dataset
+CITYSCAPES_PATH = "/storage/workspaces/artorg_aimi/ws_00000/fei/cityscapes_small/train/images/"
+
 PRINT_PATH = './results/log.txt'

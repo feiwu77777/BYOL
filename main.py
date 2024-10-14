@@ -14,8 +14,8 @@ if __name__ == '__main__':
         os.remove(PRINT_PATH)
     
     IMG_SIZE = 224
-    BATCH_SIZE = 256
-    workers = 8 # nb of cpus
+    BATCH_SIZE = 16 # mak it 32 for cityscapes
+    workers = 4 # nb of cpus
     EPOCHS = 200
     SEED = 0
     SIMSIAM = False
@@ -32,8 +32,8 @@ if __name__ == '__main__':
     opt = torch.optim.Adam(learner.parameters(), lr=3e-4)
 
     set_random(SEED)
-    dataset_name = 'pascal_VOC'
-    dataloader, dataset_sampler = prepare_dataset(dataset_name, BATCH_SIZE, workers, distributed=False)
+    dataset_name = 'intuitive'
+    dataloader, dataset_sampler = prepare_dataset(dataset_name, BATCH_SIZE, workers, distributed=False, SEED=SEED)
 
     _, _, names = next(iter(dataloader))
     with open(PRINT_PATH, "a") as f:

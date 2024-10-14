@@ -29,7 +29,7 @@ def main(gpu, ngpus_per_node, world_size):
     rank = init_rank * ngpus_per_node + gpu
 
     dist_backend = 'nccl'
-    dist_url = 'tcp://127.0.0.1:33333'
+    dist_url = 'tcp://127.0.0.1:33330'
     dist.init_process_group(backend=dist_backend, init_method=dist_url,
                             world_size=world_size, rank=rank)
 
@@ -42,8 +42,8 @@ def main(gpu, ngpus_per_node, world_size):
         if not os.path.exists('./results/checkpoints'):
             os.makedirs('./results/checkpoints')
     
-    IMG_SIZE = 512
-    BATCH_SIZE = 64
+    IMG_SIZE = 769
+    BATCH_SIZE = 16
     EPOCHS = 200
     SEED = 0
     SIMSIAM = False
@@ -69,8 +69,8 @@ def main(gpu, ngpus_per_node, world_size):
 
     ## prepare datasets ##
     set_random(SEED)
-    dataset_name = 'pascal_VOC'
-    dataloader, dataset_sampler = prepare_dataset(dataset_name, BATCH_SIZE, workers)
+    dataset_name = 'cityscapes'
+    dataloader, dataset_sampler = prepare_dataset(dataset_name, BATCH_SIZE, workers, distributed=True)
 
     _, _, names = next(iter(dataloader))
     with open(PRINT_PATH, "a") as f:
@@ -81,6 +81,7 @@ def main(gpu, ngpus_per_node, world_size):
         f.write(f'train dataloader length: {len(dataloader)}, bs: {BATCH_SIZE}\n')
 
     best_loss = np.inf
+    print_once = True
     for epoch in range(EPOCHS):
         dataset_sampler.set_epoch(epoch)
         
@@ -88,8 +89,10 @@ def main(gpu, ngpus_per_node, world_size):
             f.write(f'Rank {rank} - Epoch: {epoch}\n')
         epoch_loss = 0
         for images, labels, names in dataloader:
-            with open(PRINT_PATH, "a") as f:
-                f.write(f'Rank {rank} - images: {images.shape}, labels: {labels.shape}\n')
+            if print_once:
+                with open(PRINT_PATH, "a") as f:
+                    f.write(f'Rank {rank} - images: {images.shape}, labels: {labels.shape}\n')
+                print_once = False
             images = images.to(device, non_blocking=True)
             loss = learner(images)
             epoch_loss += loss.item()

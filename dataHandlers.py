@@ -193,10 +193,81 @@ class DataHandlerPascal(Dataset):
         img_path, label_path = self.data_pool[item]
         x = Image.open(img_path)
         x = self.tensor_op(x)
-        x = self.normalize_op(x)
+        # x = self.normalize_op(x)
 
         name = img_path.split("/")[-1].split(".")[0]
         return x, np.zeros((10, 10)), name
 
     def __len__(self):
         return len(self.data_pool)
+
+
+class DataHandlerCityscapes(Dataset):
+    def __init__(
+        self,
+        img_path,
+        sequences,
+    ):
+        super(DataHandlerCityscapes).__init__()
+        self.img_path = img_path
+        self.data_pool = np.array(sequences)
+
+        self.normalize_op = transforms.Normalize(
+            mean=torch.tensor([0.485, 0.456, 0.406]),
+            std=torch.tensor([0.229, 0.224, 0.225])
+        )
+        self.tensor_op = transforms.ToTensor()
+
+    def __getitem__(self, item):
+        # ToDo check if dataloading and label decoding is a bottleneck, if yes perform pre-loading
+        # set seed for consistent DA
+        img_path = self.data_pool[item]
+        name = img_path.split("/")[-1].split(".")[0]
+
+        img = Image.open(img_path)
+        img = self.tensor_op(img)
+        return img, np.zeros((10, 10)), name
+
+    def __len__(self):
+        return len(self.data_pool)
+
+
+class DataHandlerIntuitive(Dataset):
+    def __init__(self,
+                 basepath: str,
+                 sequences,):
+        super(DataHandlerIntuitive).__init__()
+        self.img_path = []
+        self.labels = []
+
+        self.labels_path = basepath + 'labels/'
+        images_path = basepath + 'images/'
+        # load labels and frames
+        ind_keyword = len(self.labels_path + 'seq_xx/')
+        for seq in sequences:
+            files = sorted(
+                glob.glob(os.path.join(self.labels_path, seq, '*.png')))
+            img_files = os.listdir(os.path.join(images_path, seq))
+            assert len(files) > 0
+            for f in files:
+                if f[ind_keyword:] not in img_files:
+                    continue
+                self.labels.append(f)
+                self.img_path.append(f.replace('labels', 'images'))
+
+        self.normalize_op = transforms.Normalize(
+            mean=torch.tensor([0.485, 0.456, 0.406]),
+            std=torch.tensor([0.229, 0.224, 0.225])
+        )
+        self.tensor_op = transforms.ToTensor()
+
+    def __getitem__(self, item):
+        img_path = self.img_path[item]
+        x = Image.open(img_path).resize((512, 512))
+        x = self.tensor_op(x)
+
+        name = img_path.split("/")[-1].split(".")[0]
+        return x, np.zeros((10, 10)), name
+
+    def __len__(self):
+        return len(self.img_path)
