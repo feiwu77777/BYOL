@@ -195,7 +195,7 @@ class DataHandlerPascal(Dataset):
         x = self.tensor_op(x)
         # x = self.normalize_op(x)
 
-        name = img_path.split("/")[-1].split(".")[0]
+        name = img_path.split("/")[-2] + "/" + img_path.split("/")[-1].split(".")[0]
         return x, np.zeros((10, 10)), name
 
     def __len__(self):
@@ -222,7 +222,7 @@ class DataHandlerCityscapes(Dataset):
         # ToDo check if dataloading and label decoding is a bottleneck, if yes perform pre-loading
         # set seed for consistent DA
         img_path = self.data_pool[item]
-        name = img_path.split("/")[-1].split(".")[0]
+        name = img_path.split("/")[-2] + "/" + img_path.split("/")[-1].split(".")[0]
 
         img = Image.open(img_path)
         img = self.tensor_op(img)
@@ -266,7 +266,7 @@ class DataHandlerIntuitive(Dataset):
         x = Image.open(img_path).resize((512, 512))
         x = self.tensor_op(x)
 
-        name = img_path.split("/")[-1].split(".")[0]
+        name = img_path.split("/")[-2] + "/" + img_path.split("/")[-1].split(".")[0]
         return x, np.zeros((10, 10)), name
 
     def __len__(self):

@@ -24,6 +24,17 @@ def init_distributed_dataparallel():
     # main_worker process function
     mp.spawn(main, nprocs=ngpus_per_node, args=(ngpus_per_node, world_size))
 
+def load_simSiam_ImageNet(model):
+    weight_path = '../pretrained_models/simSiam_ImageNet/checkpoint_0099.pth.tar'
+    checkpoint = torch.load(weight_path)
+    weight = checkpoint['state_dict']
+    new_weight = {}
+    for k, v in weight.items():
+        new_weight[k.replace('module.encoder.', '')] = v
+
+    logs = model.load_state_dict(new_weight, strict=False)
+    return model, logs
+
 def main(gpu, ngpus_per_node, world_size):
     init_rank = 0
     rank = init_rank * ngpus_per_node + gpu
@@ -42,13 +53,18 @@ def main(gpu, ngpus_per_node, world_size):
         if not os.path.exists('./results/checkpoints'):
             os.makedirs('./results/checkpoints')
     
-    IMG_SIZE = 769
-    BATCH_SIZE = 16
+    IMG_SIZE = 512
+    BATCH_SIZE = 32
     EPOCHS = 200
     SEED = 0
-    SIMSIAM = False
+    SIMSIAM = True
 
     resnet = models.resnet50(pretrained=True)
+
+    ### load simSiam model ###
+    resnet, logs = load_simSiam_ImageNet(resnet)
+    with open(PRINT_PATH, "a") as f:
+        f.write(f'Rank {rank} simSiam model loaded - logs: {logs}\n')
 
     ## distributed training code
     torch.cuda.set_device(gpu)
@@ -69,7 +85,7 @@ def main(gpu, ngpus_per_node, world_size):
 
     ## prepare datasets ##
     set_random(SEED)
-    dataset_name = 'cityscapes'
+    dataset_name = 'pascal_VOC'
     dataloader, dataset_sampler = prepare_dataset(dataset_name, BATCH_SIZE, workers, distributed=True)
 
     _, _, names = next(iter(dataloader))

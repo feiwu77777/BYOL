@@ -9,12 +9,20 @@ import numpy as np
 from utils import set_random
 import os
 
+dataset_img_size = {
+    'pascal_VOC': 512,
+    'auris': 220,
+    'intuitive': 224,
+    'cityscapes': 769,
+}
+
 if __name__ == '__main__':
     if os.path.isfile(PRINT_PATH):
         os.remove(PRINT_PATH)
-    
-    IMG_SIZE = 220
-    BATCH_SIZE = 16 # mak it 32 for cityscapes
+
+    dataset_name = 'pascal_VOC'
+    IMG_SIZE = dataset_img_size[dataset_name]
+    BATCH_SIZE = 16
     workers = 4 # nb of cpus
     SIMSIAM = False
 
@@ -27,7 +35,6 @@ if __name__ == '__main__':
         use_momentum = not SIMSIAM,
     )
 
-    dataset_name = 'auris'
     dataloader, dataset_sampler = prepare_dataset(dataset_name, BATCH_SIZE, workers, distributed=False)
 
     _, _, names = next(iter(dataloader))
