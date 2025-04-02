@@ -9,33 +9,18 @@ import numpy as np
 from utils import set_random
 import os
 
-def load_simSiam_ImageNet(model):
-    weight_path = '../pretrained_models/simSiam_ImageNet/checkpoint_0099.pth.tar'
-    checkpoint = torch.load(weight_path)
-    weight = checkpoint['state_dict']
-    new_weight = {}
-    for k, v in weight.items():
-        new_weight[k.replace('module.encoder.', '')] = v
-
-    logs = model.load_state_dict(new_weight, strict=False)
-    return model, logs
-
 if __name__ == '__main__':
     if os.path.isfile(PRINT_PATH):
         os.remove(PRINT_PATH)
     
-    IMG_SIZE = 512
-    BATCH_SIZE = 32 # mak it 32 for cityscapes
+    IMG_SIZE = 224
+    BATCH_SIZE = 16 # mak it 32 for cityscapes
     workers = 4 # nb of cpus
     EPOCHS = 200
     SEED = 0
-    SIMSIAM = True
+    SIMSIAM = False
 
     resnet = models.resnet50(pretrained=True)
-    ### load simSiam model ###
-    resnet, logs = load_simSiam_ImageNet(resnet)
-    with open(PRINT_PATH, "a") as f:
-        f.write(f'simSiam model loaded - logs: {logs}\n')
 
     learner = BYOL(
         resnet,

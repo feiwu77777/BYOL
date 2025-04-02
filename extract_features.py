@@ -17,10 +17,11 @@ dataset_img_size = {
 }
 
 if __name__ == '__main__':
+    # set GPU number to 1 in the bash file ##
     if os.path.isfile(PRINT_PATH):
         os.remove(PRINT_PATH)
 
-    dataset_name = 'pascal_VOC'
+    dataset_name = 'auris'
     IMG_SIZE = dataset_img_size[dataset_name]
     BATCH_SIZE = 16
     workers = 4 # nb of cpus
@@ -44,7 +45,8 @@ if __name__ == '__main__':
         f.write(f'first dataset sample: {names[0]}\n')
         f.write(f'train dataloader length: {len(dataloader)}, bs: {BATCH_SIZE}\n')
 
-    save_root = f'/storage/workspaces/artorg_aimi/ws_00000/fei/BYOL/{dataset_name}'
+    pretrained_folder = 'simSiam_ImageNet_finetune' # BYOL, simSiam_ImageNet_finetune
+    save_root = f'/storage/workspaces/artorg_aimi/ws_00000/fei/{pretrained_folder}/{dataset_name}'
     checkpoint_path = f'{save_root}/checkpoints/best_model.pt'
     checkpoint = torch.load(checkpoint_path, map_location=lambda storage, loc: storage.cuda(0) if torch.cuda.is_available() else storage.cpu())
     learner.online_encoder.load_state_dict(checkpoint['online_encoder'])

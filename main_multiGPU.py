@@ -40,7 +40,7 @@ def main(gpu, ngpus_per_node, world_size):
     rank = init_rank * ngpus_per_node + gpu
 
     dist_backend = 'nccl'
-    dist_url = 'tcp://127.0.0.1:33330'
+    dist_url = 'tcp://127.0.0.1:33334'
     dist.init_process_group(backend=dist_backend, init_method=dist_url,
                             world_size=world_size, rank=rank)
 
@@ -53,11 +53,11 @@ def main(gpu, ngpus_per_node, world_size):
         if not os.path.exists('./results/checkpoints'):
             os.makedirs('./results/checkpoints')
     
-    IMG_SIZE = 512
+    IMG_SIZE = 220
     BATCH_SIZE = 32
     EPOCHS = 200
     SEED = 0
-    SIMSIAM = True
+    SIMSIAM = False
 
     resnet = models.resnet50(pretrained=True)
 
@@ -85,7 +85,7 @@ def main(gpu, ngpus_per_node, world_size):
 
     ## prepare datasets ##
     set_random(SEED)
-    dataset_name = 'pascal_VOC'
+    dataset_name = 'auris'
     dataloader, dataset_sampler = prepare_dataset(dataset_name, BATCH_SIZE, workers, distributed=True)
 
     _, _, names = next(iter(dataloader))
